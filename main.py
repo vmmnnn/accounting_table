@@ -2,6 +2,7 @@ from consts import *
 import tkinter as tk
 from tkinter import ttk   # widget Treeview for table
 import sqlite3
+from tkinter import messagebox as mb
 
 class Main(tk.Frame):
     def __init__(self, root):
@@ -23,7 +24,7 @@ class Main(tk.Frame):
         btn_edit_dialog.pack(side=tk.LEFT)
 
         self.delete_img = tk.PhotoImage(file='buttons_pct/delete.gif')    # button delete
-        btn_delete = tk.Button(toolbar, text='Удалить', bg='white', bd=0, image=self.delete_img, compound=tk.TOP, command=self.open_delete_dialog)
+        btn_delete = tk.Button(toolbar, text='Удалить', bg='white', bd=0, image=self.delete_img, compound=tk.TOP, command=self.delete_records)
         btn_delete.pack(side=tk.LEFT)
 
             ####################################################################################
@@ -82,11 +83,13 @@ class Main(tk.Frame):
         self.view_records()
 
     def delete_records(self):
-        sel = self.tree.selection()
-        for selection_item in sel:   # selection returns numers of all chosen records
-            self.db.c.execute('''DELETE FROM tablichka WHERE id=?''', (self.tree.set(selection_item, '#1')))   # #1 - column from which we should take a number (column 1 because id is at this column)
-        self.db.conn.commit()    # To save all results
-        self.view_records()      # To show
+        answ = mb.askyesno(title="Подтверждение", message="Удалить данные?")
+        if answ == True:
+            sel = self.tree.selection()
+            for selection_item in sel:   # selection returns numers of all chosen records
+                self.db.c.execute('''DELETE FROM tablichka WHERE id=?''', (self.tree.set(selection_item, '#1')))   # #1 - column from which we should take a number (column 1 because id is at this column)
+            self.db.conn.commit()    # To save all results
+            self.view_records()      # To show
 
     def open_delete_dialog(self):
         Delete()
@@ -97,7 +100,7 @@ class Main(tk.Frame):
     def open_update_dialog(self):  # thiss function will be called after pushing the edit button
         Update()
 
-
+'''
 
 class Delete(tk.Toplevel):    # child window
     def __init__(self):
@@ -124,10 +127,10 @@ class Delete(tk.Toplevel):    # child window
         self.grab_set()   # so we can't use main window until this window is open
         self.focus_set()
 
+'''
 
 
-
-
+            # window for adding new line
 class Child(tk.Toplevel):    # child window
     def __init__(self):
         super().__init__(root)
