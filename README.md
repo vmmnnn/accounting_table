@@ -1,4 +1,3 @@
 # accounting_table
 
-Под windows
-Исп. sqlite3
+ОС Windows
