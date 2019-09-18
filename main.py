@@ -1,4 +1,6 @@
 from consts import *
+import autocomplete
+
 import tkinter as tk
 from tkinter import ttk   # widget Treeview for table
 import sqlite3
@@ -100,35 +102,6 @@ class Main(tk.Frame):
     def open_update_dialog(self):  # thiss function will be called after pushing the edit button
         Update()
 
-'''
-
-class Delete(tk.Toplevel):    # child window
-    def __init__(self):
-        super().__init__(root)
-        self.init_delete()
-        self.view = app
-
-    def btn_ok_reaction(self, event):
-        self.view.delete_records()
-        self.destroy()
-
-    def init_delete(self):
-        self.title('Подтверждение удаления')
-        self.geometry('400x100+100+300')  # first 2 numbers - size; second - place
-        self.resizable(False, False)
-
-        btn_cancel = ttk.Button(self, text='Отмена', command=self.destroy)
-        btn_cancel.place(x=300, y=50)
-
-        self.btn_ok = ttk.Button(self, text='Удалить')
-        self.btn_ok.place(x=220, y=50)
-        self.btn_ok.bind('<Button-1>', self.btn_ok_reaction)
-
-        self.grab_set()   # so we can't use main window until this window is open
-        self.focus_set()
-
-'''
-
 
             # window for adding new line
 class Child(tk.Toplevel):    # child window
@@ -148,6 +121,7 @@ class Child(tk.Toplevel):    # child window
                           self.entry_shipping_date.get(),
                           self.entry_shipping_way.get())
         self.destroy()
+
 
     def init_child(self):
         self.title('Добавить')
@@ -191,7 +165,10 @@ class Child(tk.Toplevel):    # child window
         self.entry_FIO = ttk.Entry(self)
         self.entry_FIO.place(x=200, y=110)
 
-        self.entry_product = ttk.Entry(self)
+
+#        self.entry_product = ttk.Entry(self)               # ADD AUTOCOMPLETE FROM https://gist.github.com/uroshekic/11078820
+        autocomplete_list = products_list()
+        self.entry_product = autocomplete.AutocompleteEntry(autocomplete_list, self, self, listboxLength=6, width=20, matchesFunction=autocomplete.matches)
         self.entry_product.place(x=200, y=140)
 
         self.entry_payment = ttk.Entry(self)
@@ -239,6 +216,7 @@ class Update(Child):   # window for changing values. Child because windows are a
                                 self.entry_shipping_way.get())
         self.destroy()
 
+    #def btn_close_reaction(self, event):
 
     def init_edit(self):
         self.title('Редактировать позицию')
@@ -246,6 +224,8 @@ class Update(Child):   # window for changing values. Child because windows are a
         btn_edit.place(x=205, y=350)
 
         btn_edit.bind('<Button-1>', self.btn_edit_reaction)
+        btn_edit.bind('<Return>', self.btn_edit_reaction)
+        #btn_edit.bind('<Escape>', self.destroy)
         self.btn_ok.destroy()   # Because we have button 'edit' insead of 'Ok'
 
 
@@ -261,6 +241,8 @@ class DB:
         self.c.execute('''INSERT INTO tablichka (shipping, link, FIO, product, payment, net, order_date, shipping_date, shipping_way) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''', (shipping, link, FIO, product, payment, net, order_date, shipping_date, shipping_way))
         self.conn.commit()
 
+def products_list():
+    return ['арбуз', 'армия', 'болото', 'борщ', 'ворота', 'вино', 'вода', 'гармошка', 'град', 'голубь', 'дерево', 'дом', 'декорация', 'pen', 'pencil', 'pa', 'po', 'pu', 'pppp', 'pep', 'ptr', 'book', 'ручка', 'рюмка']
 
 root = tk.Tk()
 db = DB()
