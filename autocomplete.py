@@ -5,11 +5,242 @@ Inspired by http://code.activestate.com/recipes/578253-an-entry-with-autocomplet
 ! При нажатии кнопкой мыши на вариант, он не выбирается без выбора клавишами
 
 """
-
+from tkinter import font
 from tkinter import *
 import re
 
+class CustomListBox(Listbox):
+
+    def __init__(self, master=None, *args, **kwargs):
+        Listbox.__init__(self, master, *args, **kwargs)
+
+        self.bg = "white"
+        self.fg = "black"
+        self.h_bg = "#eee8aa"
+        self.h_fg = "blue"
+
+        self.current = -1  # current highlighted item
+
+        self.fill()
+
+        self.bind("<Motion>", self.on_motion)
+        self.bind("<Leave>", self.on_leave)
+
+    def fill(self, number=15):
+        """Fills the listbox with some numbers"""
+        for i in range(number):
+            self.insert(END, i)
+            self.itemconfig(i, {"bg": self.bg})
+            self.itemconfig(i, {"fg": self.fg})
+
+    def reset_colors(self):
+        """Resets the colors of the items"""
+        for item in self.get(0, END):
+            self.itemconfig(item, {"bg": self.bg})
+            self.itemconfig(item, {"fg": self.fg})
+
+    def set_highlighted_item(self, index):
+        """Set the item at index with the highlighted colors"""
+        self.itemconfig(index, {"bg": self.h_bg})
+        self.itemconfig(index, {"fg": self.h_fg})
+
+    def on_motion(self, event):
+        """Calls everytime there's a motion of the mouse"""
+        index = self.index("@%s,%s" % (event.x, event.y))
+        if self.current != -1 and self.current != index:
+            self.reset_colors()
+            self.set_highlighted_item(index)
+        elif self.current == -1:
+            self.set_highlighted_item(index)
+        self.current = index
+
+    def on_leave(self, event):
+        self.reset_colors()
+        self.current = -1
+
+
+
+
+##################################################################################
+
+
 class AutocompleteEntry(Entry):
+    def __init__(self, autocompleteList, window, *args, **kwargs):
+        # Listbox length
+
+        if 'listboxLength' in kwargs:
+            self.listboxLength = kwargs['listboxLength']
+            del kwargs['listboxLength']
+        else:
+            self.listboxLength = 6
+
+        # Custom matches function
+        if 'matchesFunction' in kwargs:
+            self.matchesFunction = kwargs['matchesFunction']
+            del kwargs['matchesFunction']
+        else:
+            def matches(fieldValue, acListEntry):
+                pattern = re.compile('.*' + re.escape(fieldValue) + '.*', re.IGNORECASE)
+                return re.match(pattern, acListEntry)
+
+            self.matchesFunction = matches
+        self.scroll_offset = 0
+        self.listbox_font = font.Font(size=8)
+        self.window = window
+        self.entry = Entry.__init__(self, *args, **kwargs)
+
+        self.autocompleteList = autocompleteList
+
+        self.var = self["textvariable"]
+        if self.var == '':
+            self.var = self["textvariable"] = StringVar()
+
+        self.var.trace('w', self.changed)
+        self.bind("<Right>", self.selection)
+        self.bind("<Return>", self.selection)
+        self.bind("<Button-1>", self.selection)
+        self.bind("<Up>", self.moveUp)
+        self.bind("<Down>", self.moveDown)
+
+        self.listboxUp = False
+
+    def changed(self, name, index, mode):
+        if self.var.get() == '':
+            if self.listboxUp:
+                self.entry.listbox.destroy()
+                self.listboxUp = False
+        else:
+            words = self.comparison()
+            if words:
+                if not self.listboxUp:
+                    self.listbox = Listbox(self.window, width=self["width"], height=self.listboxLength, selectmode=SINGLE, font=self.listbox_font)
+                    self.listbox.bind("<Button-1>", self.selection)
+                    self.listbox.bind("<Right>", self.selection)
+                    self.listbox.bind("<Escape>", self.listbox.destroy)
+                    self.listbox.bind("<Motion>", self.mouse_move)
+                    self.listbox.bind("<MouseWheel>", self.mouse_scroll)
+                    self.listbox.place(x=self.winfo_x(), y=self.winfo_y() + self.winfo_height())
+
+                    self.listboxUp = True
+
+                self.listbox.delete(0, END)
+                for w in words:
+                    self.listbox.insert(END,w)
+            else:
+                if self.listboxUp:
+                    self.listbox.destroy()
+                    self.listboxUp = False
+
+    def selection(self, event):
+        if self.listboxUp:
+            self.var.set(self.listbox.get(ACTIVE))
+            self.listbox.destroy()
+            self.scroll_offset = 0
+            self.listboxUp = False
+            self.icursor(END)
+
+    def mouse_move(self, event):
+        abs_coord_x = self.listbox.winfo_pointerx() - self.listbox.winfo_rootx()    # Координаты мыши в listbox
+        abs_coord_y = self.listbox.winfo_pointery() - self.listbox.winfo_rooty()    # Высота пункта в listbox = 20
+        #if self.listbox.curselection() == ():
+        #    index = '0'
+        #else:
+    #        index = self.listbox.curselection()[0]
+        ind = abs_coord_y // 12
+        if ind == 0:
+            ind = (abs_coord_y + 1) // 12
+        print(abs_coord_y)
+        #print(ind, self.scroll_offset)
+        ind = ind + self.scroll_offset
+        #ind = ind + int(index)
+        self.listbox.activate(ind)
+
+    def mouse_scroll(self, event):
+        if event.num == 5 or event.delta == -120:   # Down
+            self.scroll_down(event)
+        #    if self.listbox.curselection() == ():
+    #            index = '0'
+#            else:
+#                index = self.listbox.curselection()[0]
+#
+#            if index != END:
+#                self.listbox.selection_clear(first=index)
+#                index = str(int(index) + 1)
+#
+#                self.listbox.see(index) # Scroll!
+#                self.listbox.selection_set(first=index)
+#                self.listbox.activate(index)
+        if event.num == 4 or event.delta == 120:    # Up
+            self.scroll_up(event)
+
+    def scroll_down(self, event):
+        if self.listboxUp:
+            if self.listbox.curselection() == ():
+                index = '0'
+            else:
+                index = self.listbox.curselection()[0]
+            print(self.listbox.size())
+            if index != END:
+                print(index, END)
+                if str(int(index) + 1) != END and str(int(index) + 2) != END and str(int(index) + 3) != END:
+                    self.scroll_offset = self.scroll_offset + 4
+                else:
+                    self.scroll_offset = self.scroll_offset + 2
+                self.listbox.selection_clear(first=index)
+                index = str(int(index) + self.scroll_offset)
+                #self.listbox.see(index) # Scroll!
+                self.listbox.selection_set(first=index)
+                self.listbox.activate(index)
+
+    def scroll_up(self, event):
+        if self.listboxUp:
+            if self.listbox.curselection() == ():
+                index = '0'
+            else:
+                index = self.listbox.curselection()[0]
+            if index != '0':
+                if str(int(index) - 1) != '0' and str(int(index) - 2) != '0' and str(int(index) - 3) != '0':
+                    self.scroll_offset = self.scroll_offset - 4
+                else:
+                    self.scroll_offset = self.scroll_offset - 2
+                self.listbox.selection_clear(first=index)
+                index = str(int(index) - self.scroll_offset)
+                #self.listbox.see(index) # Scroll!
+                self.listbox.selection_set(first=index)
+                self.listbox.activate(index)
+
+    def moveUp(self, event):
+        if self.listboxUp:
+            if self.listbox.curselection() == ():
+                index = '0'
+            else:
+                index = self.listbox.curselection()[0]
+            if index != '0':
+                self.listbox.selection_clear(first=index)
+                index = str(int(index) - 1)
+                self.listbox.see(index) # Scroll!
+                self.listbox.selection_set(first=index)
+                self.listbox.activate(index)
+
+    def moveDown(self, event):
+        if self.listboxUp:
+            if self.listbox.curselection() == ():
+                index = '0'
+            else:
+                index = self.listbox.curselection()[0]
+            if index != END:
+                self.listbox.selection_clear(first=index)
+                index = str(int(index) + 1)
+                self.listbox.see(index) # Scroll!
+                self.listbox.selection_set(first=index)
+                self.listbox.activate(index)
+
+    def comparison(self):
+        return [ w for w in self.autocompleteList if self.matchesFunction(self.var.get(), w) ]
+
+
+
+class AutocompleteEntry1(Entry):
     def __init__(self, autocompleteList, window, *args, **kwargs):
         # Listbox length
 
@@ -48,6 +279,37 @@ class AutocompleteEntry(Entry):
 
         self.listboxUp = False
 
+    def mouse_move(self, event):
+        abs_coord_x = self.listbox.winfo_pointerx() - self.listbox.winfo_rootx()    # Координаты мыши в listbox
+        abs_coord_y = self.listbox.winfo_pointery() - self.listbox.winfo_rooty()    # Высота пункта в listbox = 20
+        if self.listbox.curselection() == ():
+            index = '0'
+        else:
+            index = self.listbox.curselection()[0]
+        #print(index)
+        ind = abs_coord_y // 20
+        if ind == 0:
+            ind = (abs_coord_y + 1) // 20
+        ind = ind + int(index)
+        self.listbox.activate(ind)
+
+    def mouse_scroll(self, event):
+        if event.num == 5 or event.delta == -120:   # Down
+            if self.listbox.curselection() == ():
+                index = '0'
+            else:
+                index = self.listbox.curselection()[0]
+
+            if index != END:
+                self.listbox.selection_clear(first=index)
+                index = str(int(index) + 1)
+
+                self.listbox.see(index) # Scroll!
+                self.listbox.selection_set(first=index)
+                self.listbox.activate(index)
+        if event.num == 4 or event.delta == 120:    # Up
+            print(222222)
+
     def changed(self, name, index, mode):
         if self.var.get() == '':
             if self.listboxUp:
@@ -60,6 +322,8 @@ class AutocompleteEntry(Entry):
                     self.listbox = Listbox(self.window, width=self["width"], height=self.listboxLength)
                     self.listbox.bind("<Button-1>", self.selection)
                     self.listbox.bind("<Right>", self.selection)
+                    self.listbox.bind("<Motion>", self.mouse_move)
+                    self.listbox.bind("<MouseWheel>", self.mouse_scroll)
                     self.listbox.place(x=self.winfo_x(), y=self.winfo_y() + self.winfo_height())
 
                     self.listboxUp = True
