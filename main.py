@@ -14,35 +14,17 @@ class Main(tk.Frame):
         self.view_records()
 
     def init_main(self):       ##############                D R A W I N G        S C R E E N
-        toolbar = tk.Frame(bg='white', bd=2)   # bd - border       Add, Edit, Delete
-        toolbar.pack(side=tk.TOP, fill=tk.X)   # toolbar is on the top
-                                                                            ####### B U T T O N S
-        self.add_img = tk.PhotoImage(file='buttons_pct/add.gif')    # button add
-        btn_open_dialog = tk.Button(toolbar, text='Добавить позицию', command=self.open_dialog, bg='white', bd=0, compound=tk.TOP, image=self.add_img)
-        btn_open_dialog.pack(side=tk.LEFT)
-
-        self.update_img = tk.PhotoImage(file='buttons_pct/update.gif')    # button edit
-        btn_edit_dialog = tk.Button(toolbar, text='Редактировать', bg='white', bd=0, image=self.update_img, compound=tk.TOP, command=self.open_update_dialog)
-        btn_edit_dialog.pack(side=tk.LEFT)
-
-        self.delete_img = tk.PhotoImage(file='buttons_pct/delete.gif')    # button delete
-        btn_delete = tk.Button(toolbar, text='Удалить', bg='white', bd=0, image=self.delete_img, compound=tk.TOP, command=self.delete_records)
-        btn_delete.pack(side=tk.LEFT)
-
-            ####################################################################################
-                                            #      T A B L E
+        self.toolbar = tk.Frame(bg='white', bd=2)   # bd - border       Add, Edit, Delete
+        self.toolbar.pack(side=tk.TOP, fill=tk.X)   # toolbar is on the top
+        self.draw_toolbar()
+                                        #      T A B L E
         self.tree = ttk.Treeview(self, columns=('ID', 'shipping', 'link', 'FIO', 'product', 'payment', 'net', 'order_date', 'shipping_date', 'shipping_way'), height=TABLE_HEIGHT, show='headings') # show=... - not to show 0 columns
+        self.draw_scrollbar()
+        self.draw_columns()
 
-                    ################ SCROLLBAR
-        w, h = SCREEN
-        toolbar.update()
-        toolbar_height = toolbar.winfo_screenheight()
-        scrollbar_x, scrollbar_y = SCROLLBAR_COORDINATES
-        vsb = ttk.Scrollbar(self.tree, orient="vertical", command=self.tree.yview)
-        vsb.place(x=scrollbar_x, y=scrollbar_y, height=SCROLLBAR_HEIGHT)
-        self.tree.configure(yscrollcommand=vsb.set)
+        self.tree.pack()
 
-                    ################ COLUMNS
+    def draw_columns(self):
         self.tree.column('ID', width=0, anchor=tk.CENTER) # where the text should be in column
         self.tree.column('shipping', width=SHIPPING_COLUMN, anchor=tk.CENTER)
         self.tree.column('link', width=LINK_COLUMN, anchor=tk.CENTER)
@@ -65,7 +47,32 @@ class Main(tk.Frame):
         self.tree.heading('shipping_date', text='Дата отправки')
         self.tree.heading('shipping_way', text='Способ отправки')
 
-        self.tree.pack()
+    def draw_scrollbar(self):
+        w, h = SCREEN
+        self.toolbar.update()
+        self.toolbar_height = self.toolbar.winfo_screenheight()
+        scrollbar_x, scrollbar_y = SCROLLBAR_COORDINATES
+        vsb = ttk.Scrollbar(self.tree, orient="vertical", command=self.tree.yview)
+        vsb.place(x=scrollbar_x, y=scrollbar_y, height=SCROLLBAR_HEIGHT)
+        self.tree.configure(yscrollcommand=vsb.set)
+
+
+    def draw_toolbar(self):                                 ####### B U T T O N S
+        self.add_img = tk.PhotoImage(file='buttons_pct/add.gif')    # button add
+        btn_open_dialog = tk.Button(self.toolbar, text='Добавить позицию', command=self.open_dialog, bg='white', bd=0, compound=tk.TOP, image=self.add_img)
+        btn_open_dialog.pack(side=tk.LEFT)
+
+        self.update_img = tk.PhotoImage(file='buttons_pct/update.gif')    # button edit
+        btn_edit_dialog = tk.Button(self.toolbar, text='Редактировать', bg='white', bd=0, image=self.update_img, compound=tk.TOP, command=self.open_update_dialog)
+        btn_edit_dialog.pack(side=tk.LEFT)
+
+        self.delete_img = tk.PhotoImage(file='buttons_pct/delete.gif')    # button delete
+        btn_delete = tk.Button(self.toolbar, text='Удалить', bg='white', bd=0, image=self.delete_img, compound=tk.TOP, command=self.delete_records)
+        btn_delete.pack(side=tk.LEFT)
+
+        self.to_excel_img = tk.PhotoImage(file='buttons_pct/to_excel.gif')    # button add
+        btn_to_excel = tk.Button(self.toolbar, text='Выгрузить в excel', command=self.to_excel, bg='white', bd=0, compound=tk.TOP, image=self.to_excel_img)
+        btn_to_excel.pack(side=tk.LEFT)
 
 
     def records(self, shipping, link, FIO, product, payment, net, order_date, shipping_date, shipping_way):
@@ -92,6 +99,21 @@ class Main(tk.Frame):
                 self.db.c.execute('''DELETE FROM tablichka WHERE id=?''', (self.tree.set(selection_item, '#1')))   # #1 - column from which we should take a number (column 1 because id is at this column)
             self.db.conn.commit()    # To save all results
             self.view_records()      # To show
+
+    def to_excel(self):     # Выгрузить данные в excel
+        FILENAME = "data/data.csv"
+        self.db.c.execute('''SELECT shipping, link, FIO, product, payment, net, order_date, shipping_date, shipping_way FROM tablichka''')
+        component = self.db.c.fetchall()
+        main_list = []
+        for row in component:
+            list1 = list(row)
+            main_list.append(list1)
+        out = open(FILENAME, 'w')
+        for row in main_list:
+            for column in row:
+                out.write('%s;' % str(column))
+            out.write('\n')
+        out.close()
 
     def open_delete_dialog(self):
         Delete()
