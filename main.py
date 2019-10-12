@@ -136,7 +136,8 @@ class Child(tk.Toplevel):    # child window
         self.view.records(self.entry_shipping.get(),
                           self.entry_link.get(),
                           self.entry_FIO.get(),
-                          self.entry_product.get(),
+                          self.products,
+                          #self.entry_product.get(),
                           self.entry_payment.get(),
                           self.entry_net.get(),
                           self.entry_order_date.get(),
@@ -144,10 +145,22 @@ class Child(tk.Toplevel):    # child window
                           self.entry_shipping_way.get())
         self.destroy()
 
+    def add_product(self, event):
+        pass
+
+    def format_string(self):
+        return (
+            'Всем доброго времени суток!\nПерейдем к задаче.\nТребуется вывести'
+            'в поле Text отчет, который будет разделен построчно а не одним '
+            'сплошным текстом. Требуется поместить в параметры передаваемые '
+            'функции insert переменные, которые будут инкрементироваться с каждым '
+            'прохождением цикла соответственно будет осуществляться переход на '
+            'новую строку.'
+        )
 
     def init_child(self):
         self.title('Добавить')
-        self.geometry('400x400+400+100')  # first 2 numbers - size; second - place
+        self.geometry('400x450+400+100')  # first 2 numbers - size; second - place
         self.resizable(False, False)
 
         label_shipping = tk.Label(self, text='Доставка')  # names of text fields
@@ -163,19 +176,19 @@ class Child(tk.Toplevel):    # child window
         label_product.place(x=50, y=140)
 
         label_payment = tk.Label(self, text='Сумма')
-        label_payment.place(x=50, y=170)
+        label_payment.place(x=50, y=230)    # 170 instead of 230
 
         label_net = tk.Label(self, text='Чистыми')
-        label_net.place(x=50, y=200)
+        label_net.place(x=50, y=260)
 
         label_order_date = tk.Label(self, text='Дата заказа')
-        label_order_date.place(x=50, y=230)
+        label_order_date.place(x=50, y=290)
 
         label_shipping_date = tk.Label(self, text='Дата отправки')
-        label_shipping_date.place(x=50, y=260)
+        label_shipping_date.place(x=50, y=320)
 
         label_shipping_way = tk.Label(self, text='Способ отправки')
-        label_shipping_way.place(x=50, y=290)
+        label_shipping_way.place(x=50, y=350)
 
 
         self.entry_shipping = ttk.Entry(self)   # make a place where to write new positions
@@ -187,33 +200,47 @@ class Child(tk.Toplevel):    # child window
         self.entry_FIO = ttk.Entry(self)
         self.entry_FIO.place(x=200, y=110)
 
+                                                    # ADD AUTOCOMPLETE FROM https://gist.github.com/uroshekic/11078820
+#        autocomplete_list = products_list()
+#        self.entry_product = autocomplete.AutocompleteEntry(autocomplete_list, self, self, listboxLength=6, width=20, matchesFunction=autocomplete.matches)
+        self.products = []
+        self.add_products = ttk.Button(self, text='Ред', width=5)
+        self.add_products.place(x=330, y=140)
+        self.add_products.bind('<Button-1>', self.add_product)
 
-#        self.entry_product = ttk.Entry(self)               # ADD AUTOCOMPLETE FROM https://gist.github.com/uroshekic/11078820
-        autocomplete_list = products_list()
-        self.entry_product = autocomplete.AutocompleteEntry(autocomplete_list, self, self, listboxLength=6, width=20, matchesFunction=autocomplete.matches)
-        self.entry_product.place(x=200, y=140)
+        self.products_text = tk.Text(self, state='disabled', width=15, height=5, bg="white", wrap=tk.WORD)
+        self.products_text.insert(1.0, self.format_string())
+        self.products_text.place(x=200, y=140)
+
+
+        scroll = tk.Scrollbar(command=self.products_text.yview)
+        scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.products_text.config(yscrollcommand=scroll.set)
+
+        #self.products_text.update()
+        #self.entry_product.place(x=200, y=140)
 
         self.entry_payment = ttk.Entry(self)
-        self.entry_payment.place(x=200, y=170)
+        self.entry_payment.place(x=200, y=230)  # 170 instead 230
 
         self.entry_net = ttk.Entry(self)
-        self.entry_net.place(x=200, y=200)
+        self.entry_net.place(x=200, y=260)
 
         self.entry_order_date = ttk.Entry(self)
-        self.entry_order_date.place(x=200, y=230)
+        self.entry_order_date.place(x=200, y=290)
 
         self.entry_shipping_date = ttk.Entry(self)
-        self.entry_shipping_date.place(x=200, y=260)
+        self.entry_shipping_date.place(x=200, y=320)
 
         self.entry_shipping_way = ttk.Entry(self)
-        self.entry_shipping_way.place(x=200, y=290)
+        self.entry_shipping_way.place(x=200, y=350)
 
 
         btn_cancel = ttk.Button(self, text='Закрыть', command=self.destroy)
-        btn_cancel.place(x=300, y=350)
+        btn_cancel.place(x=300, y=400)
 
         self.btn_ok = ttk.Button(self, text='Добавить')
-        self.btn_ok.place(x=220, y=350)
+        self.btn_ok.place(x=220, y=400)
         self.btn_ok.bind('<Button-1>', self.btn_add_reaction)
 
 
