@@ -6,11 +6,13 @@ from tkinter import ttk   # widget Treeview for table
 import sqlite3
 from tkinter import messagebox as mb
 
+
 class Main(tk.Frame):
     def __init__(self, root):
         super().__init__(root)
         self.init_main()
         self.db = db
+        self.db_people = db_people
         self.view_records()
 
     def init_main(self):       ##############                D R A W I N G        S C R E E N
@@ -76,15 +78,33 @@ class Main(tk.Frame):
 
 
     def records(self, shipping, link, FIO, product, payment, net, order_date, shipping_date, shipping_way):
-        self.db.insert_data(shipping, link, FIO, product, payment, net, order_date, shipping_date, shipping_way)
+        self.db.insert_data(shipping, product, payment, net, order_date, shipping_date, shipping_way)
+        self.db_people.insert_data(link, FIO)
         self.view_records()
 
     def view_records(self):
-        #scrollbar = tk.Scrollbar(self)
-        #scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.db.c.execute('''SELECT * FROM tablichka''')
-        [self.tree.delete(i) for i in self.tree.get_children()]  # clean, because we don't need double lines
-        [self.tree.insert('', 'end', values = row) for row in self.db.c.fetchall()]  # new value is after previous
+        self.db_people.c.execute('''SELECT * FROM people''')
+
+        people_data = self.db_people.c.fetchall()
+        num_record = 1
+        for row in self.db.c.fetchall():
+            i = 0
+            res_row = [str(num_record)]    # Номер записи в таблице
+            num_record += 1
+            res_row.append(str(row[1]))   # shipping
+            res_row.append(str((people_data[i])[0]))  # link
+            res_row.append(str((people_data[i])[1]))  # FIO
+            i += 1
+            j = -1
+            for t in row:
+                j += 1
+                if j == 0 or j == 1:
+                    continue
+                res_row.append(str(t))
+            [self.tree.delete(i) for i in self.tree.get_children()]  # clean, because we don't need double lines
+            [self.tree.insert('', 'end', values = res_row)]  # new value is after previous
+
 
     def update_record(self, shipping, link, FIO, product, payment, net, order_date, shipping_date, shipping_way):   # to change values: UPDATE changes them. Then description...=? - what to change, WHERE ID - which line
         self.db.c.execute('''UPDATE tablichka SET shipping=?, link=?, FIO=?, product=?, payment=?, net=?, order_date=?, shipping_date=?, shipping_way=? WHERE ID=?''', (shipping, link, FIO, product, payment, net, order_date, shipping_date, shipping_way, self.tree.set(self.tree.selection()[0], '#1')))  # #1 - column №1 - ID
@@ -250,24 +270,47 @@ class Update(Child):   # window for changing values. Child because windows are a
         #btn_edit.bind('<Escape>', self.destroy)
         self.btn_ok.destroy()   # Because we have button 'edit' insead of 'Ok'
 
+class DB_people:
+    def __init__(self):
+        self.conn = sqlite3.connect('data/people.db')
+        self.c = self.conn.cursor()    # to have an opportunity to change add etc
+        self.c.execute('''CREATE TABLE IF NOT EXISTS people (link text primary key, FIO text)''')
+        self.conn.commit()
+
+    def insert_data(self, link, FIO):
+        self.c.execute('''INSERT INTO people (link, FIO) VALUES (?, ?)''', (link, FIO))
+        self.conn.commit()
 
 class DB:
     def __init__(self):
         self.conn = sqlite3.connect('data/tablichka.db')
         self.c = self.conn.cursor()    # to have an opportunity to change add etc
-        self.c.execute('''CREATE TABLE IF NOT EXISTS tablichka (id integer primary key, shipping real, link text, FIO text, product text, payment real, net real, order_date text, shipping_date text, shipping_way text)''')
+        self.c.execute('''CREATE TABLE IF NOT EXISTS tablichka (id integer primary key, shipping real, product text, payment real, net real, order_date text, shipping_date text, shipping_way text)''')
+        self.conn.commit()
+
+    def insert_data(self, shipping, product, payment, net, order_date, shipping_date, shipping_way):
+        self.c.execute('''INSERT INTO tablichka (shipping, product, payment, net, order_date, shipping_date, shipping_way) VALUES (?, ?, ?, ?, ?, ?, ?)''', (shipping, product, payment, net, order_date, shipping_date, shipping_way))
         self.conn.commit()
 
 
-    def insert_data(self, shipping, link, FIO, product, payment, net, order_date, shipping_date, shipping_way):
-        self.c.execute('''INSERT INTO tablichka (shipping, link, FIO, product, payment, net, order_date, shipping_date, shipping_way) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''', (shipping, link, FIO, product, payment, net, order_date, shipping_date, shipping_way))
-        self.conn.commit()
+#class DB:
+#    def __init__(self):
+#        self.conn = sqlite3.connect('data/tablichka.db')
+#        self.c = self.conn.cursor()    # to have an opportunity to change add etc
+#        self.c.execute('''CREATE TABLE IF NOT EXISTS tablichka (id integer primary key, shipping real, link text, FIO text, product text, payment real, net real, order_date text, shipping_date text, shipping_way text)''')
+#        self.conn.commit()
+
+#    def insert_data(self, shipping, link, FIO, product, payment, net, order_date, shipping_date, shipping_way):
+#        self.c.execute('''INSERT INTO tablichka (shipping, link, FIO, product, payment, net, order_date, shipping_date, shipping_way) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''', (shipping, link, FIO, product, payment, net, order_date, shipping_date, shipping_way))
+#        self.conn.commit()
+
 
 def products_list():
     return ['арбуз', 'армия', 'болото', 'борщ', 'ворота', 'вино', 'вода', 'гармошка', 'град', 'голубь', 'дерево', 'дом', 'декорация', 'pen', 'pencil', 'pa', 'po', 'pu', 'pppp', 'pep', 'ptr', 'book', 'ручка', 'рюмка']
 
 root = tk.Tk()
 db = DB()
+db_people = DB_people()
 app = Main(root)
 app.pack()
 
