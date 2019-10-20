@@ -1,9 +1,9 @@
 from consts import *
+from database import *
 import autocomplete
 
 import tkinter as tk
 from tkinter import ttk   # widget Treeview for table
-import sqlite3
 from tkinter import messagebox as mb
 
 
@@ -20,7 +20,7 @@ class Main(tk.Frame):
         self.toolbar.pack(side=tk.TOP, fill=tk.X)   # toolbar is on the top
         self.draw_toolbar()
                                         #      T A B L E
-        self.tree = ttk.Treeview(self, columns=('ID', 'shipping', 'link', 'FIO', 'product', 'payment', 'net', 'order_date', 'shipping_date', 'shipping_way'), height=TABLE_HEIGHT, show='headings') # show=... - not to show 0 columns
+        self.tree = ttk.Treeview(self, columns=('ID', 'num', 'shipping', 'link', 'FIO', 'product', 'payment', 'net', 'order_date', 'shipping_date', 'shipping_way'), height=TABLE_HEIGHT, show='headings') # show=... - not to show 0 columns
         self.draw_scrollbar()
         self.draw_columns()
 
@@ -28,6 +28,7 @@ class Main(tk.Frame):
 
     def draw_columns(self):
         self.tree.column('ID', width=0, anchor=tk.CENTER) # where the text should be in column
+        self.tree.column('num', width=NUM_COLUMN, anchor=tk.CENTER) # where the text should be in column
         self.tree.column('shipping', width=SHIPPING_COLUMN, anchor=tk.CENTER)
         self.tree.column('link', width=LINK_COLUMN, anchor=tk.CENTER)
         self.tree.column('FIO', width=FIO_COLUMN, anchor=tk.CENTER)
@@ -39,6 +40,7 @@ class Main(tk.Frame):
         self.tree.column('shipping_way', width=SHIPPING_WAY_COLUMN, anchor=tk.CENTER)
 
         self.tree.heading('ID', text='')
+        self.tree.heading('num', text='№')
         self.tree.heading('shipping', text='Доставка')
         self.tree.heading('link', text='Ссылка')
         self.tree.heading('FIO', text='ФИО')
@@ -77,37 +79,60 @@ class Main(tk.Frame):
         btn_to_excel.pack(side=tk.LEFT)
 
 
-    def records(self, shipping, link, FIO, product, payment, net, order_date, shipping_date, shipping_way):
-        self.db.insert_data(shipping, product, payment, net, order_date, shipping_date, shipping_way)
-        self.db_people.insert_data(link, FIO)
+    def records(self, shipping, new_link, new_FIO, product, payment, net, order_date, shipping_date, shipping_way):
+        self.db_people.c.execute('''SELECT id_client FROM people WHERE link = ? AND FIO = ?''', (new_link, new_FIO))
+        list_res = self.db_people.c.fetchall()
+        if list_res:    # we already have this client
+            new_id_client = list_res[0][0]
+        else:
+            self.db_people.insert_data(new_link, new_FIO)    # write new client
+            self.db_people.c.execute('''SELECT id_client FROM people WHERE link = ? AND FIO = ?''', (new_link, new_FIO))
+            new_id_client = self.db_people.c.fetchall()[0][0]
+        self.db.insert_data(new_id_client, shipping, product, payment, net, order_date, shipping_date, shipping_way)
         self.view_records()
 
     def view_records(self):
-        self.db.c.execute('''SELECT * FROM tablichka''')
         self.db_people.c.execute('''SELECT * FROM people''')
+        self.db.c.execute('''SELECT ID, id_client, shipping_way FROM tablichka''')
 
-        people_data = self.db_people.c.fetchall()
-        num_record = 1
+        [self.tree.delete(i) for i in self.tree.get_children()]  # clean, because we don't need double lines
+
+        num_record = 0
+        self.db.c.execute('''SELECT * FROM tablichka''')
         for row in self.db.c.fetchall():
-            i = 0
-            res_row = [str(num_record)]    # Номер записи в таблице
+            self.db_people.c.execute('''SELECT * FROM people WHERE id_client = ?''', (row[1],))
+            person = self.db_people.c.fetchall()[0]
+            res_row = [str(row[0]), str(num_record + 1)]
             num_record += 1
-            res_row.append(str(row[1]))   # shipping
-            res_row.append(str((people_data[i])[0]))  # link
-            res_row.append(str((people_data[i])[1]))  # FIO
-            i += 1
-            j = -1
-            for t in row:
-                j += 1
-                if j == 0 or j == 1:
+            res_row.append(str(row[2]))   # shipping
+            res_row.append(str(person[1]))  # link
+            res_row.append(str(person[2]))  # FIO
+
+            col = -1
+            for t in row:    # other columns (date etc)
+                col += 1
+                if col in range(3):
                     continue
                 res_row.append(str(t))
-            [self.tree.delete(i) for i in self.tree.get_children()]  # clean, because we don't need double lines
             [self.tree.insert('', 'end', values = res_row)]  # new value is after previous
 
 
     def update_record(self, shipping, link, FIO, product, payment, net, order_date, shipping_date, shipping_way):   # to change values: UPDATE changes them. Then description...=? - what to change, WHERE ID - which line
-        self.db.c.execute('''UPDATE tablichka SET shipping=?, link=?, FIO=?, product=?, payment=?, net=?, order_date=?, shipping_date=?, shipping_way=? WHERE ID=?''', (shipping, link, FIO, product, payment, net, order_date, shipping_date, shipping_way, self.tree.set(self.tree.selection()[0], '#1')))  # #1 - column №1 - ID
+        self.db.c.execute('''SELECT id_client FROM tablichka WHERE ID=?''', (self.tree.set(self.tree.selection()[0], '#1')))  # #1 - column №1 - ID
+        id_client = self.db.c.fetchall()[0][0]
+
+        self.db.c.execute('''SELECT COUNT(*) FROM tablichka WHERE id_client=?''', (id_client,))
+        orders = int(self.db.c.fetchall()[0][0])
+
+        if orders == 1:   # there is no more orders with this client => we can change
+            self.db_people.c.execute('''UPDATE people SET link=?, FIO=? WHERE id_client=?''', (link, FIO, id_client))
+        else:
+            self.db_people.c.execute('''INSERT INTO people (link, FIO) VALUES (?, ?)''', (link, FIO))
+            self.db_people.c.execute('''SELECT id_client FROM people WHERE link = ? AND FIO = ?''', (link, FIO))
+            id_client = self.db_people.c.fetchall()[0][0]
+        self.db_people.conn.commit()
+
+        self.db.c.execute('''UPDATE tablichka SET id_client=?, shipping=?, product=?, payment=?, net=?, order_date=?, shipping_date=?, shipping_way=? WHERE ID=?''', (id_client, shipping, product, payment, net, order_date, shipping_date, shipping_way, self.tree.set(self.tree.selection()[0], '#1')))  # #1 - column №1 - ID
         self.db.conn.commit()
         self.view_records()
 
@@ -116,24 +141,50 @@ class Main(tk.Frame):
         if answ == True:
             sel = self.tree.selection()
             for selection_item in sel:   # selection returns numers of all chosen records
-                self.db.c.execute('''DELETE FROM tablichka WHERE id=?''', (self.tree.set(selection_item, '#1')))   # #1 - column from which we should take a number (column 1 because id is at this column)
+                self.db.c.execute('''SELECT id_client FROM tablichka WHERE id=?''', (self.tree.set(selection_item, '#1')))
+                id_to_delete = self.db.c.fetchall()[0][0]
+                self.db.c.execute('''SELECT COUNT(*) FROM tablichka WHERE id_client=?''', (id_to_delete,))    # if this client had only one order => delete from people
+                orders = self.db.c.fetchall()[0][0]
+                if orders == 1:   # delete from people
+                    self.db_people.c.execute('''DELETE FROM people WHERE id_client = ?''', (id_to_delete,))
+                self.db.c.execute('''DELETE FROM tablichka WHERE id = ?''', (self.tree.set(selection_item, '#1')))   # #1 - column from which we should take a number (column 1 because id is at this column)
             self.db.conn.commit()    # To save all results
+            self.db_people.conn.commit()
             self.view_records()      # To show
 
     def to_excel(self):     # Выгрузить данные в excel
         FILENAME = "data/data.csv"
-        self.db.c.execute('''SELECT shipping, link, FIO, product, payment, net, order_date, shipping_date, shipping_way FROM tablichka''')
-        component = self.db.c.fetchall()
-        main_list = []
-        for row in component:
-            list1 = list(row)
-            main_list.append(list1)
+        self.db.c.execute('''SELECT * FROM tablichka''')
+        table = self.db.c.fetchall()
+
+        num_record = 0
+        main_list = [["ID", "Num", "Shipping", "Link", "Name", "Order", "Sum", "Net", "order_date", "shipping_date", "shipping_way"]]
+
+        for row in table:
+            num_record += 1
+            cur_list = [row[0], num_record, row[2]]    # row[1] - id_client
+
+            self.db_people.c.execute('''SELECT link, FIO FROM people WHERE id_client=?''', (row[0],))
+            person = self.db_people.c.fetchall()
+
+            cur_list.append(person[0][0])
+            cur_list.append(person[0][1])
+
+            col = -1
+            for t in row:    # other columns (date etc)
+                col += 1
+                if col in range(3):
+                    continue
+                cur_list.append(str(t))
+            main_list.append(cur_list)
+
         out = open(FILENAME, 'w')
         for row in main_list:
             for column in row:
                 out.write('%s;' % str(column))
             out.write('\n')
         out.close()
+
 
     def open_delete_dialog(self):
         Delete()
@@ -240,6 +291,7 @@ class Child(tk.Toplevel):    # child window
         self.grab_set()   # so we can't use main window until this window is open
         self.focus_set()
 
+
 class Update(Child):   # window for changing values. Child because windows are almost the same: another title and button 'edit' instead of 'Ok'
     def __init__(self):
         super().__init__()
@@ -258,8 +310,6 @@ class Update(Child):   # window for changing values. Child because windows are a
                                 self.entry_shipping_way.get())
         self.destroy()
 
-    #def btn_close_reaction(self, event):
-
     def init_edit(self):
         self.title('Редактировать позицию')
         btn_edit = ttk.Button(self, text='Редактировать')
@@ -267,46 +317,11 @@ class Update(Child):   # window for changing values. Child because windows are a
 
         btn_edit.bind('<Button-1>', self.btn_edit_reaction)
         btn_edit.bind('<Return>', self.btn_edit_reaction)
-        #btn_edit.bind('<Escape>', self.destroy)
         self.btn_ok.destroy()   # Because we have button 'edit' insead of 'Ok'
-
-class DB_people:
-    def __init__(self):
-        self.conn = sqlite3.connect('data/people.db')
-        self.c = self.conn.cursor()    # to have an opportunity to change add etc
-        self.c.execute('''CREATE TABLE IF NOT EXISTS people (link text primary key, FIO text)''')
-        self.conn.commit()
-
-    def insert_data(self, link, FIO):
-        self.c.execute('''INSERT INTO people (link, FIO) VALUES (?, ?)''', (link, FIO))
-        self.conn.commit()
-
-class DB:
-    def __init__(self):
-        self.conn = sqlite3.connect('data/tablichka.db')
-        self.c = self.conn.cursor()    # to have an opportunity to change add etc
-        self.c.execute('''CREATE TABLE IF NOT EXISTS tablichka (id integer primary key, shipping real, product text, payment real, net real, order_date text, shipping_date text, shipping_way text)''')
-        self.conn.commit()
-
-    def insert_data(self, shipping, product, payment, net, order_date, shipping_date, shipping_way):
-        self.c.execute('''INSERT INTO tablichka (shipping, product, payment, net, order_date, shipping_date, shipping_way) VALUES (?, ?, ?, ?, ?, ?, ?)''', (shipping, product, payment, net, order_date, shipping_date, shipping_way))
-        self.conn.commit()
-
-
-#class DB:
-#    def __init__(self):
-#        self.conn = sqlite3.connect('data/tablichka.db')
-#        self.c = self.conn.cursor()    # to have an opportunity to change add etc
-#        self.c.execute('''CREATE TABLE IF NOT EXISTS tablichka (id integer primary key, shipping real, link text, FIO text, product text, payment real, net real, order_date text, shipping_date text, shipping_way text)''')
-#        self.conn.commit()
-
-#    def insert_data(self, shipping, link, FIO, product, payment, net, order_date, shipping_date, shipping_way):
-#        self.c.execute('''INSERT INTO tablichka (shipping, link, FIO, product, payment, net, order_date, shipping_date, shipping_way) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''', (shipping, link, FIO, product, payment, net, order_date, shipping_date, shipping_way))
-#        self.conn.commit()
 
 
 def products_list():
-    return ['арбуз', 'армия', 'болото', 'борщ', 'ворота', 'вино', 'вода', 'гармошка', 'град', 'голубь', 'дерево', 'дом', 'декорация', 'pen', 'pencil', 'pa', 'po', 'pu', 'pppp', 'pep', 'ptr', 'book', 'ручка', 'рюмка']
+    return ['A1', 'A2', 'A3', 'A4', 'B1', 'B2', 'B3', 'C1', 'C2', 'C3', 'C4', 'D1', 'D2', 'pen', 'pencil', 'pa', 'po', 'pu', 'pppp', 'pep', 'ptr', 'book', 'ручка', 'рюмка']
 
 root = tk.Tk()
 db = DB()
