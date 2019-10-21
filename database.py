@@ -12,6 +12,20 @@ class DB_people:
         self.conn.commit()
 
 
+
+class DB_products:
+    def __init__(self):
+        self.conn = sqlite3.connect('data/products.db')
+        self.c = self.conn.cursor()    # to have an opportunity to change add etc
+        self.c.execute('''CREATE TABLE IF NOT EXISTS products (id_product integer primary key, name text, prime_cost integer)''')   # prime_cost - себестоимость
+        self.conn.commit()
+
+    def insert_data(self, name, prime_cost):
+        self.c.execute('''INSERT INTO products (name, prime_cost) VALUES (?, ?)''', (name, prime_cost))
+        self.conn.commit()
+
+
+
 class DB:
     def __init__(self):
         self.conn = sqlite3.connect('data/tablichka.db')

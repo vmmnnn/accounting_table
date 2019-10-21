@@ -5,7 +5,7 @@ import autocomplete
 import tkinter as tk
 from tkinter import ttk   # widget Treeview for table
 from tkinter import messagebox as mb
-
+from tkinter import filedialog as fd
 
 class Main(tk.Frame):
     def __init__(self, root):
@@ -13,6 +13,7 @@ class Main(tk.Frame):
         self.init_main()
         self.db = db
         self.db_people = db_people
+        self.db_products = db_products
         self.view_records()
 
     def init_main(self):       ##############                D R A W I N G        S C R E E N
@@ -52,14 +53,10 @@ class Main(tk.Frame):
         self.tree.heading('shipping_way', text='Способ отправки')
 
     def draw_scrollbar(self):
-        w, h = SCREEN
-        self.toolbar.update()
-        self.toolbar_height = self.toolbar.winfo_screenheight()
         scrollbar_x, scrollbar_y = SCROLLBAR_COORDINATES
         vsb = ttk.Scrollbar(self.tree, orient="vertical", command=self.tree.yview)
         vsb.place(x=scrollbar_x, y=scrollbar_y, height=SCROLLBAR_HEIGHT)
         self.tree.configure(yscrollcommand=vsb.set)
-
 
     def draw_toolbar(self):                                 ####### B U T T O N S
         self.add_img = tk.PhotoImage(file='buttons_pct/add.gif')    # button add
@@ -77,6 +74,10 @@ class Main(tk.Frame):
         self.to_excel_img = tk.PhotoImage(file='buttons_pct/to_excel.gif')    # button add
         btn_to_excel = tk.Button(self.toolbar, text='Выгрузить в excel', command=self.to_excel, bg='white', bd=0, compound=tk.TOP, image=self.to_excel_img)
         btn_to_excel.pack(side=tk.LEFT)
+
+        self.products_img = tk.PhotoImage(file='buttons_pct/products.gif')    # button add
+        btn_products = tk.Button(self.toolbar, text='Товары', command=self.open_products, bg='white', bd=0, compound=tk.TOP, image=self.products_img)
+        btn_products.pack(side=tk.LEFT)
 
 
     def records(self, shipping, new_link, new_FIO, product, payment, net, order_date, shipping_date, shipping_way):
@@ -115,7 +116,6 @@ class Main(tk.Frame):
                     continue
                 res_row.append(str(t))
             [self.tree.insert('', 'end', values = res_row)]  # new value is after previous
-
 
     def update_record(self, shipping, link, FIO, product, payment, net, order_date, shipping_date, shipping_way):   # to change values: UPDATE changes them. Then description...=? - what to change, WHERE ID - which line
         self.db.c.execute('''SELECT id_client FROM tablichka WHERE ID=?''', (self.tree.set(self.tree.selection()[0], '#1')))  # #1 - column №1 - ID
@@ -192,11 +192,216 @@ class Main(tk.Frame):
     def open_dialog(self):
         Child()
 
-    def open_update_dialog(self):  # thiss function will be called after pushing the edit button
+    def open_update_dialog(self):  # this function will be called after pushing the edit button
         Update()
 
+    def open_products(self):   # To open a new window - table with products
+        Products_window()
 
-            # window for adding new line
+
+class Products_window(tk.Toplevel):
+    def __init__(self):
+        super().__init__(root)
+        self.init_products()
+        self.db = db
+        self.db_people = db_people
+        self.db_products = db_products
+        self.view_records()
+
+    def init_products(self):
+        self.title('Товары')
+        self.geometry('400x400+400+100')  # first 2 numbers - size; second - place
+        self.resizable(False, False)
+
+        self.draw_menu()
+
+        self.toolbar = tk.Frame(self, bg='white', bd=2)   # bd - border       Add, Edit, Delete
+        self.toolbar.pack(side=tk.TOP, fill=tk.X)   # toolbar is on the top
+        self.draw_toolbar()
+                                        #      T A B L E
+        self.tree = ttk.Treeview(self, columns=('ID', 'num', 'name', 'prime_cost'), height=380, show='headings') # show=... - not to show 0 columns
+        self.draw_scrollbar()
+        self.draw_columns()
+
+        self.tree.pack()
+
+        self.focus_set()
+
+    def records(self, name, prime_cost):
+        self.db_products.insert_data(str(name), int(prime_cost))
+        self.view_records()
+
+    def view_records(self):
+        self.db_products.c.execute('''SELECT * FROM products''')
+        [self.tree.delete(i) for i in self.tree.get_children()]  # clean, because we don't need double lines
+        num_record = 0
+        for row in self.db_products.c.fetchall():
+            num_record += 1
+            res_row = [row[0], num_record, row[1], row[2]]
+            [self.tree.insert('', 'end', values = res_row)]  # new value is after previous
+
+    def update_record(self, name, prime_cost):   # to change values: UPDATE changes them. Then description...=? - what to change, WHERE ID - which line
+        self.db_products.c.execute('''UPDATE products SET name=?, prime_cost=? WHERE id_product=?''', (name, prime_cost, self.tree.set(self.tree.selection()[0], '#1')))  # #1 - column №1 - ID
+        self.db_products.conn.commit()
+        self.view_records()
+
+
+    def draw_toolbar(self):                                 ####### B U T T O N S
+        self.add_img = tk.PhotoImage(file='buttons_pct/add.gif')    # button add
+        btn_open_dialog = tk.Button(self.toolbar, text='Добавить позицию', command=self.open_dialog, bg='white', bd=0, compound=tk.TOP, image=self.add_img)
+        btn_open_dialog.pack(side=tk.LEFT)
+
+        self.update_img = tk.PhotoImage(file='buttons_pct/update.gif')    # button edit
+        btn_edit_dialog = tk.Button(self.toolbar, text='Редактировать', bg='white', bd=0, image=self.update_img, compound=tk.TOP, command=self.open_update_dialog)
+        btn_edit_dialog.pack(side=tk.LEFT)
+
+        self.delete_img = tk.PhotoImage(file='buttons_pct/delete.gif')    # button delete
+        btn_delete = tk.Button(self.toolbar, text='Удалить', bg='white', bd=0, image=self.delete_img, compound=tk.TOP, command=self.delete_records)
+        btn_delete.pack(side=tk.LEFT)
+
+    def draw_menu(self):
+        mainmenu = tk.Menu(self)
+        self.config(menu=mainmenu)
+        filemenu = tk.Menu(mainmenu, tearoff=0)
+        filemenu.add_command(label="Выгрузить в excel", command=self.to_excel)
+        filemenu.add_command(label="Догрузить из excel", command=self.from_excel)
+        mainmenu.add_cascade(label="Excel", menu=filemenu)
+
+    def draw_columns(self):
+        self.tree.column('ID', width=0, anchor=tk.CENTER) # where the text should be in column
+        self.tree.column('num', width=NUM_COLUMN, anchor=tk.CENTER) # where the text should be in column
+        self.tree.column('name', width=NAME_PRODUCT_COLUMN, anchor=tk.CENTER)
+        self.tree.column('prime_cost', width=PRIME_COST_PRODUCT_COLUMN, anchor=tk.CENTER)
+
+        self.tree.heading('ID', text='')
+        self.tree.heading('num', text='№')
+        self.tree.heading('name', text='Название')
+        self.tree.heading('prime_cost', text='Себестоимость')
+
+    def draw_scrollbar(self):
+        self.toolbar.update()
+        toolbar_height = self.toolbar.winfo_screenheight()
+        scrollbar_x, scrollbar_y = 345, toolbar_height % 10 + 23
+        vsb = ttk.Scrollbar(self.tree, orient="vertical", command=self.tree.yview)
+        vsb.place(x=scrollbar_x, y=scrollbar_y, height=302)
+        self.tree.configure(yscrollcommand=vsb.set)
+
+    def to_excel(self):     # Выгрузить данные в excel
+        FILENAME = "data/products.csv"
+        self.db_products.c.execute('''SELECT * FROM products''')
+        table = self.db_products.c.fetchall()
+
+        num_record = 0
+        main_list = [["ID", "Num", "Name", "Prime cost"]]
+
+        for row in table:
+            num_record += 1
+            cur_list = [row[0], num_record, row[1], row[2]]
+            main_list.append(cur_list)
+
+        out = open(FILENAME, 'w')
+        for row in main_list:
+            for column in row:
+                out.write('%s;' % str(column))
+            out.write('\n')
+        out.close()
+
+    def from_excel(self):
+        file_name = fd.askopenfilename()
+        f = open(file_name)
+        num_s = True
+        s = f.read()
+        new_products = s.split('\n')
+        for row in new_products:
+            if num_s:
+                num_s = False
+                continue
+            if not row:
+                break
+            name, prime_cost = row.split(';')
+            self.db_products.c.execute('''SELECT * FROM products WHERE name=?''', (name,))
+            if not self.db_products.c.fetchall():    # we haven't had this product yet
+                self.db_products.insert_data(str(name), int(prime_cost))
+        self.view_records()
+        #text.insert(1.0, s)
+        f.close()
+
+
+    def open_dialog(self):
+        Child_product(self)
+
+    def open_update_dialog(self):  # this function will be called after pushing the edit button
+        Update_product(self)
+
+    def delete_records(self):
+        pass
+
+
+
+class Child_product(tk.Toplevel):    # child window for product
+    def __init__(self, products):
+        super().__init__(root)
+        self.init_child()
+        self.view = products
+
+    def btn_add_reaction(self, event):
+        self.view.records(self.entry_name.get(),
+                          self.entry_prime_cost.get())
+        self.destroy()
+
+
+    def init_child(self):
+        self.title('Добавить товар')
+        self.geometry('400x160+400+100')  # first 2 numbers - size; second - place
+        self.resizable(False, False)
+
+        label_name = tk.Label(self, text='Название')  # names of text fields
+        label_name.place(x=50, y=50)
+
+        label_prime_cost = tk.Label(self, text='Себестоимость')
+        label_prime_cost.place(x=50, y=80)
+
+
+        self.entry_name = ttk.Entry(self)   # make a place where to write new positions
+        self.entry_name.place(x=200, y=50)
+
+        self.entry_prime_cost = ttk.Entry(self)
+        self.entry_prime_cost.place(x=200, y=80)
+
+
+        btn_cancel = ttk.Button(self, text='Закрыть', command=self.destroy)
+        btn_cancel.place(x=300, y=110)
+
+        self.btn_ok = ttk.Button(self, text='Добавить')
+        self.btn_ok.place(x=220, y=110)
+        self.btn_ok.bind('<Button-1>', self.btn_add_reaction)
+
+        self.grab_set()   # so we can't use main window until this window is open
+        self.focus_set()
+
+
+class Update_product(Child_product):   # window for changing products. Child because windows are almost the same: another title and button 'edit' instead of 'Ok'
+    def __init__(self, products):
+        super().__init__(products)
+        self.init_edit()
+        self.view = products
+
+    def btn_edit_reaction(self, event):
+        self.view.update_record(self.entry_name.get(),
+                                self.entry_prime_cost.get())
+        self.destroy()
+
+    def init_edit(self):
+        self.title('Редактировать товар')
+        btn_edit = ttk.Button(self, text='Редактировать')
+        btn_edit.place(x=205, y=110)
+
+        btn_edit.bind('<Button-1>', self.btn_edit_reaction)
+        btn_edit.bind('<Return>', self.btn_edit_reaction)
+        self.btn_ok.destroy()   # Because we have button 'edit' insead of 'Ok'
+
+
+
 class Child(tk.Toplevel):    # child window
     def __init__(self):
         super().__init__(root)
@@ -259,7 +464,7 @@ class Child(tk.Toplevel):    # child window
         self.entry_FIO.place(x=200, y=110)
 
 
-#        self.entry_product = ttk.Entry(self)               # ADD AUTOCOMPLETE FROM https://gist.github.com/uroshekic/11078820
+ #        self.entry_product = ttk.Entry(self)               # ADD AUTOCOMPLETE FROM https://gist.github.com/uroshekic/11078820
         autocomplete_list = products_list()
         self.entry_product = autocomplete.AutocompleteEntry(autocomplete_list, self, self, listboxLength=6, width=20, matchesFunction=autocomplete.matches)
         self.entry_product.place(x=200, y=140)
@@ -326,8 +531,12 @@ def products_list():
 root = tk.Tk()
 db = DB()
 db_people = DB_people()
+db_products = DB_products()
 app = Main(root)
 app.pack()
+
+#products = Products_window()
+#products.destroy()
 
 root.title("Database")
 w, h = SCREEN
