@@ -525,8 +525,13 @@ class Update(Child):   # window for changing values. Child because windows are a
         self.btn_ok.destroy()   # Because we have button 'edit' insead of 'Ok'
 
 
+
 def products_list():
-    return ['A1', 'A2', 'A3', 'A4', 'B1', 'B2', 'B3', 'C1', 'C2', 'C3', 'C4', 'D1', 'D2', 'pen', 'pencil', 'pa', 'po', 'pu', 'pppp', 'pep', 'ptr', 'book', 'ручка', 'рюмка']
+    db_products.c.execute('''SELECT name FROM products''')
+    products = db_products.c.fetchall()
+    return [item[0] for item in products]
+    #print(answ)
+    #return ['A1', 'A2', 'A3', 'A4', 'B1', 'B2', 'B3', 'C1', 'C2', 'C3', 'C4', 'D1', 'D2', 'pen', 'pencil', 'pa', 'po', 'pu', 'pppp', 'pep', 'ptr', 'book', 'ручка', 'рюмка']
 
 root = tk.Tk()
 db = DB()
